@@ -1,0 +1,9 @@
+[Unit]
+Description=Refresh systemd-boot entries for CachyOS Snapper snapshots
+RequiresMountsFor=/boot
+StartLimitIntervalSec=0
+
+[Service]
+Type=oneshot
+ExecStartPre=/usr/bin/rm -f /run/cachyos-snapshot-boot.pending
+ExecStart=/usr/bin/sh -c 'test -e /var/lib/pacman/db.lck || exec /usr/local/sbin/cachyos-snapshot-boot --apply'

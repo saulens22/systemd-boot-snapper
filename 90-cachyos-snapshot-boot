@@ -1,0 +1,8 @@
+#!/usr/bin/sh
+
+[ "$2" = / ] && [ "$3" = btrfs ] || exit 0
+case "$1" in
+    create-snapshot-post|modify-snapshot-post|delete-snapshot-post|set-read-only-post)
+        /usr/bin/touch /run/cachyos-snapshot-boot.pending
+        ;;
+esac
