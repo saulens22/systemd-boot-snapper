@@ -1,14 +1,14 @@
-# CachyOS Snapshot Boot
+# systemd-boot Snapper
 
-Add recent Snapper root snapshots to a CachyOS systemd-boot menu. Labels use the snapshot's date, time, type, and stored description. The generator prefers the installed CachyOS kernel and uses LTS when only LTS matches the snapshot. Both use their existing kernel and initramfs files on the EFI partition.
+Add recent Snapper root snapshots to the systemd-boot menu. Labels use the snapshot's date, time, type, and stored description. The generator discovers compatible Linux entries already on disk. It prefers a matching non-LTS kernel and falls back to LTS when available. Snapshot entries reuse the existing kernel and initramfs files on the EFI partition.
 
-**Made with OpenAI Codex and checked by a human.** The maintainer booted an equivalent recovery entry into Plasma with Secure Boot enabled and verified that creating and deleting a Snapper snapshot automatically added and removed its menu entry. The public version derives the filesystem UUID from the running system. That change was checked with local fixtures.
+**Made with OpenAI Codex and checked by a human.** On CachyOS, the maintainer booted an equivalent recovery entry into Plasma with Secure Boot enabled and verified that creating and deleting a Snapper snapshot automatically added and removed its menu entry. Distribution-independent entry discovery was checked with local fixtures.
 
 ## Requirements
 
-- CachyOS booted with systemd-boot, with the FAT EFI System Partition mounted at `/boot`.
+- systemd-boot on x86, with the FAT EFI System Partition mounted at `/boot`.
 - A Btrfs root subvolume named `@` and a Snapper `root` configuration with snapshots stored under `/.snapshots` on that root filesystem.
-- The standard `linux-cachyos.conf` or `linux-cachyos-lts.conf` entry, with loose kernel and initramfs files, a filesystem UUID in `root=`, and `rootflags=subvol=/@` or `rootflags=subvol=@`.
+- A Boot Loader Specification Type #1 Linux entry with a separate kernel and initramfs, a filesystem UUID in `root=`, `rw`, and `rootflags=subvol=/@` or `rootflags=subvol=@`. The generator skips UKIs and entries for an EAC kernel.
 - Python 3, `file`, `btrfs-progs`, and the systemd-based mkinitcpio setup with the `sd-volatile` hook for each kernel used by snapshot entries.
 
 ## Install
@@ -16,37 +16,42 @@ Add recent Snapper root snapshots to a CachyOS systemd-boot menu. Labels use the
 Run these commands from the repository checkout in a Bash-compatible shell. The preview reads the installed kernel versions and Snapper metadata and prints the entries it would create.
 
 ```sh
-sudo python3 ./cachyos-snapshot-boot
+sudo python3 ./systemd-boot-snapper
 ```
 
-If `sd-volatile` is absent from your initramfs, add the hook and rebuild the presets for the regular and LTS kernels you have installed. Skip the build command for any kernel you do not have.
+If `sd-volatile` is absent from your initramfs, add the hook and rebuild the presets for the kernels you want to boot with snapshots. These example preset names are for Arch Linux. Use the preset names installed on your system.
 
 ```sh
 printf '%s\n' 'HOOKS+=(sd-volatile)' |
   sudo tee /etc/mkinitcpio.conf.d/90-snapshot-boot.conf
-sudo mkinitcpio -p linux-cachyos
-sudo mkinitcpio -p linux-cachyos-lts
+sudo mkinitcpio -p linux
+sudo mkinitcpio -p linux-lts
 ```
 
 Install the generator and event hooks.
 
 ```sh
-sudo install -Dm755 cachyos-snapshot-boot /usr/local/sbin/cachyos-snapshot-boot
-sudo install -Dm644 cachyos-snapshot-boot.service /etc/systemd/system/cachyos-snapshot-boot.service
-sudo install -Dm644 cachyos-snapshot-boot.path /etc/systemd/system/cachyos-snapshot-boot.path
-sudo install -Dm755 90-cachyos-snapshot-boot /usr/lib/snapper/plugins/90-cachyos-snapshot-boot
-sudo install -Dm644 zzz-cachyos-snapshot-boot.hook /etc/pacman.d/hooks/zzz-cachyos-snapshot-boot.hook
+sudo install -Dm755 systemd-boot-snapper /usr/local/sbin/systemd-boot-snapper
+sudo install -Dm644 systemd-boot-snapper.service /etc/systemd/system/systemd-boot-snapper.service
+sudo install -Dm644 systemd-boot-snapper.path /etc/systemd/system/systemd-boot-snapper.path
+sudo install -Dm755 90-systemd-boot-snapper /usr/lib/snapper/plugins/90-systemd-boot-snapper
 sudo systemctl daemon-reload
-sudo systemctl enable --now cachyos-snapshot-boot.path
-sudo cachyos-snapshot-boot --apply
+sudo systemctl enable --now systemd-boot-snapper.path
+sudo systemd-boot-snapper --apply
 sudo bootctl --no-pager list
+```
+
+On pacman-based distributions, install the optional post-transaction hook.
+
+```sh
+sudo install -Dm644 zzz-systemd-boot-snapper.hook /etc/pacman.d/hooks/zzz-systemd-boot-snapper.hook
 ```
 
 ## Refresh and boot
 
-Snapper events refresh the menu when a root snapshot is created, changed, or deleted. The pacman hook refreshes it after kernel updates and the snap-pac post-snapshot. The generator keeps up to six compatible read-only snapshots and removes its stale entries. It writes files only when the contents change.
+Snapper events refresh the menu when a root snapshot is created, changed, or deleted. The optional pacman hook refreshes it after kernel updates and the snap-pac post-snapshot. On other package managers, refresh manually after upgrading a kernel. The generator keeps up to six compatible read-only snapshots and removes its stale entries. It writes files only when the contents change.
 
-To refresh manually, run `sudo cachyos-snapshot-boot --apply`. At startup, select a snapshot by its date and description. The generator reads filenames and kernel arguments from the regular boot entries and writes only its own `cachyos-snapshot-auto-*.conf` files.
+To refresh manually, run `sudo systemd-boot-snapper --apply`. At startup, select a snapshot by its date and description. The generator reads filenames and kernel arguments from the regular boot entries and writes only its own `snapper-auto-*.conf` files.
 
 ## Recovery behavior
 
@@ -57,18 +62,18 @@ To refresh manually, run `sudo cachyos-snapshot-boot --apply`. At startup, selec
 ## Uninstall
 
 ```sh
-sudo systemctl disable --now cachyos-snapshot-boot.path
-sudo systemctl stop cachyos-snapshot-boot.service
-sudo rm -f /etc/pacman.d/hooks/zzz-cachyos-snapshot-boot.hook \
-  /usr/lib/snapper/plugins/90-cachyos-snapshot-boot \
-  /etc/systemd/system/cachyos-snapshot-boot.service \
-  /etc/systemd/system/cachyos-snapshot-boot.path \
-  /usr/local/sbin/cachyos-snapshot-boot
+sudo systemctl disable --now systemd-boot-snapper.path
+sudo systemctl stop systemd-boot-snapper.service
+sudo rm -f /etc/pacman.d/hooks/zzz-systemd-boot-snapper.hook \
+  /usr/lib/snapper/plugins/90-systemd-boot-snapper \
+  /etc/systemd/system/systemd-boot-snapper.service \
+  /etc/systemd/system/systemd-boot-snapper.path \
+  /usr/local/sbin/systemd-boot-snapper
 sudo systemctl daemon-reload
 
 # Remove only entries marked as generated by this project.
-sudo find /boot/loader/entries -maxdepth 1 -type f -name 'cachyos-snapshot-auto-*.conf' \
-  -exec grep -qxF '# Generated by cachyos-snapshot-boot' {} \; -delete
+sudo find /boot/loader/entries -maxdepth 1 -type f -name 'snapper-auto-*.conf' \
+  -exec grep -qxF '# Generated by systemd-boot-snapper' {} \; -delete
 ```
 
 If you added `90-snapshot-boot.conf` for this project, you can remove that drop-in and rebuild the regular and LTS initramfs images.

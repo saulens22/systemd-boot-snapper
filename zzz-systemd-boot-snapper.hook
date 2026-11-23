@@ -6,6 +6,6 @@ Operation = Remove
 Target = *
 
 [Action]
-Description = Refreshing CachyOS snapshot boot entries
+Description = Refreshing systemd-boot snapshot entries
 When = PostTransaction
-Exec = /usr/local/sbin/cachyos-snapshot-boot --apply
+Exec = /usr/local/sbin/systemd-boot-snapper --apply

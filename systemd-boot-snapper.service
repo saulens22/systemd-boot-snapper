@@ -1,0 +1,9 @@
+[Unit]
+Description=Refresh systemd-boot entries for Snapper root snapshots
+RequiresMountsFor=/boot
+StartLimitIntervalSec=0
+
+[Service]
+Type=oneshot
+ExecStartPre=/usr/bin/rm -f /run/systemd-boot-snapper.pending
+ExecStart=/usr/bin/sh -c 'test -e /var/lib/pacman/db.lck || exec /usr/local/sbin/systemd-boot-snapper --apply'
