@@ -185,8 +185,6 @@ def main():
         print("Skipping snapshot menu refresh outside the live Btrfs @ root.")
         return
     root_uuid = root[2]
-    if run("/usr/bin/findmnt", "-nro", "TARGET", "-T", str(SNAPSHOTS)) != "/":
-        raise ValueError(f"Expected {SNAPSHOTS} on the root subvolume")
     if (
         run("/usr/bin/bootctl", "--print-esp-path") != str(BOOT)
         or run("/usr/bin/findmnt", "-nro", "FSTYPE", "-M", str(BOOT)) != "vfat"
@@ -194,7 +192,14 @@ def main():
         raise ValueError(f"Expected a FAT EFI System Partition mounted at {BOOT}")
     with open("/run/lock/systemd-boot-snapper.lock", "a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
-        entries = desired_entries(root_uuid)
+        try:
+            SNAPSHOTS.stat()
+        except FileNotFoundError:
+            entries = {}
+        else:
+            if run("/usr/bin/findmnt", "-nro", "TARGET", "-T", str(SNAPSHOTS)) != "/":
+                raise ValueError(f"Expected {SNAPSHOTS} on the root subvolume")
+            entries = desired_entries(root_uuid)
         if args.apply:
             apply(entries)
         else:
